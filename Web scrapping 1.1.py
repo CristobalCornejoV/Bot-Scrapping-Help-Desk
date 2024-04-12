@@ -1,35 +1,39 @@
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from openpyxl import Workbook, load_workbook
 import time
 import re
-from openpyxl import Workbook, load_workbook
 
-# Opciones de configuración para el navegador Firefox
+# Rutas de archivos y ubicaciones
+ruta_firefox = "ruta_al_ejecutable_de_firefox"
+ruta_excel = "ruta_al_archivo_excel_original"
+ruta_excel_destino = "ruta_al_archivo_excel_destino"
+
+# Configuración de opciones de Firefox
 options = Options()
-options.binary_location = "ruta_al_ejecutable_de_firefox"
+options.binary_location = ruta_firefox
 
-# Crear una instancia del navegador Firefox
+# Inicializar el navegador Firefox
 driver = webdriver.Firefox(options=options)
 
-# URL de inicio de sesión (reemplaza con tu URL)
+# URL de inicio de sesión
 url = "URL_del_sitio_web"
-
-# Abrir la página de inicio de sesión
 driver.get(url)
 
-# Esperar hasta 10 segundos para que se cargue la página
+# Esperar implícitamente hasta 10 segundos para encontrar elementos
 driver.implicitly_wait(10)
 
-# Iniciar sesión con la cuenta de UdeChile
+# Iniciar sesión con UdeChile
 boton_iniciar_udechile = driver.find_element(By.XPATH, "//span[contains(text(),'Iniciar con UdeChile')]")
 boton_iniciar_udechile.click()
 
+# Esperar implícitamente hasta 10 segundos para encontrar elementos
 driver.implicitly_wait(10)
 
-# Ingresar nombre de usuario y contraseña (reemplaza con tus credenciales)
+# Ingresar credenciales de usuario
 campo_usuario = driver.find_element(By.ID, 'usernameInput')
 campo_usuario.send_keys("usuario")
 
@@ -40,7 +44,7 @@ campo_password.send_keys("contraseña")
 boton_ingresar = driver.find_element(By.XPATH, "//button[contains(text(),'Ingresar')]")
 boton_ingresar.click()
 
-# Esperar 10 segundos después de iniciar sesión
+# Esperar implícitamente hasta 10 segundos para encontrar elementos
 driver.implicitly_wait(10)
 time.sleep(5)
 
@@ -49,24 +53,26 @@ wb_destino = Workbook()
 ws_destino = wb_destino.active
 ws_destino.append(["Inventario Encontrado", "Correo solicitante"])
 
-# Leer el archivo Excel y obtener los IDs (reemplaza con la ruta de tu archivo Excel)
-workbook = load_workbook(filename="ruta_al_archivo_excel_original")
+# Leer el archivo Excel y obtener los IDs
+workbook = load_workbook(filename=ruta_excel)
 sheet = workbook.active
 columna_a = sheet['A']
 
 for cell in columna_a:
     id = cell.value
     if id: 
+        # Construir la URL del ticket
         url_ticket = f"URL_del_ticket_con_id_{id}"
         driver.get(url_ticket)
         time.sleep(3)
 
-        # Encontrar el número de inventario del PC dentro del elemento con id "frmCampos:dtHistoryItems_data"
         try:
+            # Encontrar el elemento de historial
             elemento_historial = driver.find_element(By.ID, "frmCampos:dtHistoryItems_data")
             lineas = elemento_historial.text.split('\n')
             numero_inventario = "Código no encontrado"
             for linea in lineas:
+                # Buscar número de inventario del PC
                 match_pc = re.search(r'Número\s*de\s*inventario\s*del\s*PC\s*:\s*(\S+)', linea)
                 match_igeo = re.search(r'Número\s*de\s*inventario\s*\(\s*IGEO\s*\)\s*del\s*computador\s*:\s*(\S+)', linea)
                 if match_pc:
@@ -76,7 +82,7 @@ for cell in columna_a:
                     numero_inventario = match_igeo.group(1)
                     break
 
-            # Encontrar el título dentro del elemento con la clase "profile" y dentro de "cuttedText"
+            # Encontrar el título
             elemento_profile = driver.find_element(By.CLASS_NAME, "profile")
             elemento_cutted_text = elemento_profile.find_element(By.CLASS_NAME, "cuttedText")
             title = elemento_cutted_text.text
@@ -85,9 +91,9 @@ for cell in columna_a:
             ws_destino.append([numero_inventario, title])
 
             # Guardar el archivo Excel destino
-            wb_destino.save("ruta_al_archivo_excel_destino")
-
-            # Presionar el botón de salir para evitar bloqueos
+            wb_destino.save(ruta_excel_destino)
+            
+            # Presionar salir para no tener candado
             wait = WebDriverWait(driver, 10)
             boton_salir = wait.until(EC.visibility_of_element_located((By.XPATH, "//ul[@id='ulBar']//div[@id='frmTopBar:pnlGrpTopBar']//button[@id='frmTopBar:closeButton']")))
             boton_salir.click()
